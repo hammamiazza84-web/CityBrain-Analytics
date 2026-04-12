@@ -1,0 +1,66 @@
+{
+  "best_model_name": "XGBoost",
+  "best_model_path": "best_model.pkl",
+  "feature_names": [
+    "Sentiment_Score",
+    "Year",
+    "Month_Name",
+    "Day_Name",
+    "Hour_Interval",
+    "Is_Weekend",
+    "Peak_Status",
+    "Season",
+    "Zone_Name",
+    "City",
+    "Region",
+    "Socio_Economic_Group",
+    "User_Category",
+    "Mobility_Profile",
+    "Congestion_Status",
+    "Traffic_Source",
+    "Weather_Conditions",
+    "Wind_Direction",
+    "Is_Rush_Hour",
+    "Risk_Score"
+  ],
+  "n_classes": 6,
+  "unique_classes": [
+    2.0,
+    NaN,
+    1.0,
+    3.0,
+    4.0,
+    5.0
+  ],
+  "class_map": {
+    "2.0": 0,
+    "NaN": 1,
+    "1.0": 2,
+    "3.0": 3,
+    "4.0": 4,
+    "5.0": 5
+  },
+  "results": [
+    {
+      "Model": "XGBoost",
+      "Accuracy": 0.325,
+      "F1-Score": 0.2506099988973673,
+      "ROC-AUC": 0.4866736400774886,
+      "Composite": 0.324
+    },
+    {
+      "Model": "LSTM",
+      "Accuracy": 0.31029411764705883,
+      "F1-Score": 0.24590540402492594,
+      "ROC-AUC": 0.4899056138907596,
+      "Composite": 0.3163
+    },
+    {
+      "Model": "Random Forest",
+      "Accuracy": 0.2754901960784314,
+      "F1-Score": 0.25800542262274023,
+      "ROC-AUC": 0.4833999408804782,
+      "Composite": 0.3092
+    }
+  ]
+}
