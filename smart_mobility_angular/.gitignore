@@ -1,0 +1,22 @@
+# Angular
+.angular/
+dist/
+node_modules/
+*.log
+
+# Backend
+backend/.env
+backend/__pycache__/
+backend/*.pyc
+backend/mlartifacts/
+backend/mlflow.db
+mlflow.db
+mlartifacts/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,71 @@
+<div class="login-container">
+  <!-- Background -->
+  <div class="login-bg">
+    <div class="bg-image"></div>
+    <div class="bg-dark"></div>
+  </div>
+
+  <!-- Login Card -->
+  <div class="login-wrapper">
+    <div class="login-card">
+      <!-- Logo -->
+      <div class="brand">
+        <img src="assets/citybrain-logo.png.png" alt="CityBrain">
+        <span class="brand-name">CityBrain</span>
+        <span class="brand-tag">Urban Mobility Intelligence</span>
+      </div>
+
+      <!-- Form -->
+      <div class="login-form">
+        <div *ngIf="error" class="alert-error">
+          {{ error }}
+        </div>
+        <div *ngIf="info" class="alert-info">
+          {{ info }}
+        </div>
+
+        <h1 class="login-title">Bienvenue</h1>
+        <p class="login-subtitle">Connectez-vous pour accéder à votre mobilité intelligente.</p>
+
+        <div class="input-group">
+          <input 
+            type="email" 
+            [(ngModel)]="email" 
+            placeholder="Email"
+            (keyup.enter)="login()"
+          >
+        </div>
+
+        <div class="input-group">
+          <input 
+            type="password" 
+            [(ngModel)]="password" 
+            placeholder="Mot de passe"
+            (keyup.enter)="login()"
+          >
+        </div>
+
+        <button 
+          class="btn-primary" 
+          (click)="login()" 
+          [disabled]="loading || loadingGoogle || loadingForgot"
+        >
+          <span *ngIf="loading">Connexion...</span>
+          <span *ngIf="!loading">Se connecter</span>
+        </button>
+
+        <button
+          class="btn-google"
+          (click)="continueWithGoogle()"
+          [disabled]="loading || loadingGoogle"
+        >
+          <span class="google-icon">G</span>
+          <span *ngIf="loadingGoogle">Connexion Google...</span>
+          <span *ngIf="!loadingGoogle">Continuer avec Google</span>
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+</div>
