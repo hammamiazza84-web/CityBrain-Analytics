@@ -4,7 +4,7 @@ Connecté à SQL Server ETL (données réelles)
 """
 
 from flask import Flask, jsonify, request, redirect
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from datetime import datetime, timedelta
 import random
 import json
@@ -23,7 +23,8 @@ import urllib.parse
 import pandas as pd
 
 app = Flask(__name__)
-CORS(app)
+# Configuration CORS robuste pour éviter les blocages de préflight (OPTIONS)
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # ═══════════════════════════════════════════════════════
 # SQL SERVER CONNECTION
@@ -875,6 +876,7 @@ def full_context():
 # ═══════════════════════════════════════════════════════
 
 @app.post('/api/stress/predict')
+@cross_origin()
 def stress_predict():
     data = request.get_json(silent=True) or {}
     city = data.get('City', 'Paris')
@@ -960,7 +962,9 @@ def stress_recommend():
         'n_recommendations': len(recs), 'source': 'Fact_User_Experience ETL'})
 
 @app.post('/api/transport/predict')
+@cross_origin()
 def transport_predict():
+    request.get_json(silent=True)
     df = query_df("SELECT TOP 100 retard_s FROM Fact_Transportation ORDER BY Fact_ID DESC")
     avg_delay = round(df['retard_s'].mean() / 60, 1) if not df.empty else 5.0
     return jsonify({'prediction': avg_delay, 'unit': 'minutes', 'confidence': 0.87, 'source': 'Fact_Transportation'})
@@ -1389,7 +1393,9 @@ def piml_predict(section):
     return jsonify({'section': section, 'prediction': round(random.uniform(0, 100), 2), 'confidence': round(random.uniform(0.75, 0.95), 2)})
 
 @app.post('/api/env/predict_co2')
+@cross_origin()
 def env_co2():
+    request.get_json(silent=True)
     df = query_df("SELECT TOP 1 CO2_Emissions_kg FROM Fact_Environment ORDER BY Fact_ID DESC")
     co2 = round(df['CO2_Emissions_kg'].iloc[0], 2) if not df.empty else round(random.uniform(10, 100), 2)
     return jsonify({'prediction': co2, 'unit': 'kg CO2', 'confidence': 0.91})
