@@ -58,6 +58,21 @@ DECIDER_EMAILS = {
 }
 
 CACHE: Dict[str, Any] = {}
+CACHE_DATA: Dict[str, Any] = {}
+CACHE_EXPIRY = 600 # 10 minutes (600 seconds)
+
+def get_cached_data(key: str, fetch_fn):
+    """Gère le cache pour les requêtes SQL lourdes."""
+    now = time.time()
+    if key in CACHE_DATA:
+        entry = CACHE_DATA[key]
+        if now - entry['timestamp'] < CACHE_EXPIRY:
+            return entry['data']
+    
+    data = fetch_fn()
+    CACHE_DATA[key] = {'timestamp': now, 'data': data}
+    return data
+
 RESET_TOKENS: Dict[str, Dict[str, Any]] = {}
 
 SMTP_CONFIG = {
@@ -865,10 +880,11 @@ def stress_predict():
     city = data.get('City', 'Paris')
     peak = data.get('Peak_Status', 'Peak')
     sentiment = float(data.get('Sentiment_Score', 3))
-    df = query_df("""
-        SELECT AVG(CAST(Stress_Level AS FLOAT)) as avg_stress
-        FROM Fact_User_Experience
-    """)
+    
+    def fetch_stress_avg():
+        return query_df("SELECT AVG(CAST(Stress_Level AS FLOAT)) as avg_stress FROM Fact_User_Experience")
+    
+    df = get_cached_data('stress_avg_global', fetch_stress_avg)
     base_stress = df['avg_stress'].iloc[0] if not df.empty and df['avg_stress'].iloc[0] else 2.5
     if peak == 'Peak': base_stress = min(5, base_stress * 1.3)
     elif peak == 'Night': base_stress = max(1, base_stress * 0.7)
@@ -888,11 +904,15 @@ def stress_anomaly():
     data = request.get_json(silent=True) or {}
     stress = float(data.get('Stress_Level', 3))
     sentiment = float(data.get('Sentiment_Score', 2))
-    df = query_df("""
-        SELECT AVG(CAST(Stress_Level AS FLOAT)) as avg_s,
-               STDEV(CAST(Stress_Level AS FLOAT)) as std_s
-        FROM Fact_User_Experience
-    """)
+    
+    def fetch_stress_anomaly_stats():
+        return query_df("""
+            SELECT AVG(CAST(Stress_Level AS FLOAT)) as avg_s,
+                   STDEV(CAST(Stress_Level AS FLOAT)) as std_s
+            FROM Fact_User_Experience
+        """)
+    
+    df = get_cached_data('stress_anomaly_stats', fetch_stress_anomaly_stats)
     is_anomaly_if = False
     is_anomaly_svm = False
     if not df.empty and df['avg_s'].iloc[0]:
@@ -952,12 +972,17 @@ def transport_manual_predict():
     charge = float(data.get('charge', 50))
     is_peak = int(data.get('is_peak', 0))
     # Prédiction basée sur les données ETL réelles
-    df = query_df(f"""
-        SELECT AVG(CAST(retard_s AS FLOAT)) as avg_retard
-        FROM Fact_Transportation ft
-        LEFT JOIN Dim_heure dh ON ft.ID_Heure = dh.ID_Heure
-        WHERE ft.charge_estimee BETWEEN {max(0, charge-20)} AND {charge+20}
-    """)
+    def fetch_transport_manual_stats():
+        return query_df(f"""
+            SELECT AVG(CAST(retard_s AS FLOAT)) as avg_retard
+            FROM Fact_Transportation ft
+            LEFT JOIN Dim_heure dh ON ft.ID_Heure = dh.ID_Heure
+            WHERE ft.charge_estimee BETWEEN {max(0, charge-20)} AND {charge+20}
+        """)
+    
+    # On utilise une clé de cache dynamique basée sur la charge (arrondie à la dizaine)
+    cache_key = f"transport_manual_{int(charge/10)*10}"
+    df = get_cached_data(cache_key, fetch_transport_manual_stats)
     base_delay = round(df['avg_retard'].iloc[0] / 60, 1) if not df.empty and df['avg_retard'].iloc[0] is not None else 3.0
     # Ajustement selon heure de pointe
     if is_peak or hour in [7, 8, 9, 17, 18, 19]:
@@ -1008,12 +1033,15 @@ def transport_anomaly_manual():
     retard = float(data.get('retard', 0))
     charge = float(data.get('charge', 50))
     # Détection d'anomalie basée sur les stats ETL
-    df = query_df("""
-        SELECT AVG(CAST(retard_s AS FLOAT)) as avg_r,
-               STDEV(CAST(retard_s AS FLOAT)) as std_r,
-               AVG(CAST(charge_estimee AS FLOAT)) as avg_c
-        FROM Fact_Transportation
-    """)
+    def fetch_transport_anomaly_stats():
+        return query_df("""
+            SELECT AVG(CAST(retard_s AS FLOAT)) as avg_r,
+                   STDEV(CAST(retard_s AS FLOAT)) as std_r,
+                   AVG(CAST(charge_estimee AS FLOAT)) as avg_c
+            FROM Fact_Transportation
+        """)
+    
+    df = get_cached_data('transport_anomaly_stats', fetch_transport_anomaly_stats)
     is_anomaly = False
     score = 0.1
     if not df.empty:
@@ -1036,12 +1064,15 @@ def transport_cluster():
     data = request.get_json(silent=True) or {}
     k = int(data.get('k', 4))
     # Clustering basé sur les données ETL réelles
-    df = query_df("""
-        SELECT TOP 500
-            retard_s, charge_estimee, ID_Heure
-        FROM Fact_Transportation
-        ORDER BY Fact_ID DESC
-    """)
+    def fetch_transport_cluster_data():
+        return query_df("""
+            SELECT TOP 500
+                retard_s, charge_estimee, ID_Heure
+            FROM Fact_Transportation
+            ORDER BY Fact_ID DESC
+        """)
+    
+    df = get_cached_data('transport_cluster_data', fetch_transport_cluster_data)
     n_clusters = min(k, max(2, len(df) // 50)) if not df.empty else k
     return jsonify({
         'metrics': {'n_clusters': n_clusters, 'silhouette': 0.62},
@@ -1056,14 +1087,17 @@ def transport_cluster():
 def transport_timeseries():
     data = request.get_json(silent=True) or {}
     # Séries temporelles basées sur les données ETL réelles
-    df = query_df("""
-        SELECT TOP 200
-            ID_Heure as hour_id,
-            AVG(CAST(retard_s AS FLOAT)) as avg_retard
-        FROM Fact_Transportation
-        GROUP BY ID_Heure
-        ORDER BY ID_Heure
-    """)
+    def fetch_transport_ts_data():
+        return query_df("""
+            SELECT TOP 200
+                ID_Heure as hour_id,
+                AVG(CAST(retard_s AS FLOAT)) as avg_retard
+            FROM Fact_Transportation
+            GROUP BY ID_Heure
+            ORDER BY ID_Heure
+        """)
+    
+    df = get_cached_data('transport_ts_data', fetch_transport_ts_data)
     if df.empty:
         forecasts = [{'hour': h, 'predicted_retard': round(random.uniform(-60, 120), 1)} for h in range(24)]
         peak_h, best_h = 17, 3
